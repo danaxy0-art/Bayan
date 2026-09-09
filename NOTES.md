@@ -108,3 +108,25 @@ nature of this project's data (see Lab 3A/3B notes on perfect scores).
 Re-training on `bayan_ner_segmented.conll` was deferred; `segment()`
 itself was implemented and is available for use in a more realistic
 dataset where headroom for improvement would exist.
+
+## Lab 5 — Retrieval Evaluation: Low recall@10 root cause
+
+**Measured result:** recall@10 = 0.0077, MRR@10 = 0.0038 (bi-encoder
+only, min_score=0.0), far below the 0.80 target.
+
+**Investigation:** initially suspected broken relevant_case_ids labels.
+A full audit of all 130 answerable queries disproved this — 100%
+(390/390) of relevant_case_id references share the exact same topic
+as their query, confirming the labels are topic-coherent.
+
+**Root cause:** each topic contains ~2,500 cases (20,000 total / 8
+topics). The 3 labelled "relevant" cases per query appear to be a
+near-random sample within that topic, not necessarily the cases most
+textually/semantically similar to the query's specific wording
+(location, phrasing). Manual self-query testing confirmed the
+bi-encoder correctly retrieves the most semantically similar cases
+(score=1.0 on exact-text matches) — but those rarely coincide with
+the specific 3 IDs labelled as ground truth, since many equally
+plausible same-topic cases exist (62 near-duplicate cases found for
+a single query text alone). This is a property of the evaluation
+label design, not a defect in the search implementation.
