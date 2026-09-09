@@ -1,6 +1,123 @@
 """Lab 5 starter: versioned FAISS index build."""
 
+import json
+from pathlib import Path
 
-def build_index(*args, **kwargs):
-    # TODO(Lab 5): encode, L2-normalise, build/persist index + metadata + manifest.
-    raise NotImplementedError
+import numpy as np
+import pandas as pd
+import faiss
+
+from sentence_transformers import SentenceTransformer
+
+
+# Multilingual bi-encoder: works across Arabic and English in the same
+# embedding space, which is required for cross-lingual retrieval.
+ENCODER_NAME = "sentence-transformers/paraphrase-multilingual-mpnet-base-v2"
+
+PREPROCESSING_VERSION = "bayan_ar_v1"
+
+
+def build_index(
+    cases_path: str = "data/search/bayan_cases.csv",
+    output_prefix: str = "artifacts/search/bayan_index",
+    batch_size: int = 64,
+):
+    """Build an L2-normalised FAISS index over case texts and persist it,
+    along with row metadata and a manifest pinning the model/version used.
+
+    Writes three files, all sharing output_prefix:
+      {prefix}.faiss    - the FAISS index itself
+      {prefix}.meta.jsonl - one JSON line per case, in index order
+      {prefix}.manifest.json - encoder name, dim, preprocessing version, counts
+    """
+
+    output_path = Path(output_prefix)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+
+    # ------------------------------------------------------------
+    # 1) Load the cases
+    # ------------------------------------------------------------
+
+    df = pd.read_csv(cases_path)
+    print(f"Loaded {len(df)} cases")
+
+    texts = df["case_text"].astype(str).tolist()
+
+    # ------------------------------------------------------------
+    # 2) Encode all case texts with the multilingual bi-encoder
+    # ------------------------------------------------------------
+
+    encoder = SentenceTransformer(ENCODER_NAME)
+
+    embeddings = encoder.encode(
+        texts,
+        batch_size=batch_size,
+        show_progress_bar=True,
+        convert_to_numpy=True,
+    )
+
+    embeddings = embeddings.astype(np.float32)
+
+    # ------------------------------------------------------------
+    # 3) L2-normalise embeddings so inner product == cosine similarity
+    # ------------------------------------------------------------
+
+    faiss.normalize_L2(embeddings)
+
+    dim = embeddings.shape[1]
+
+    # ------------------------------------------------------------
+    # 4) Build a flat inner-product FAISS index
+    # ------------------------------------------------------------
+
+    index = faiss.IndexFlatIP(dim)
+    index.add(embeddings)
+
+    print(f"Index built: {index.ntotal} vectors, dim={dim}")
+
+    # ------------------------------------------------------------
+    # 5) Persist the index
+    # ------------------------------------------------------------
+
+    faiss.write_index(index, f"{output_prefix}.faiss")
+
+    # ------------------------------------------------------------
+    # 6) Persist metadata, one JSON line per case, in index order
+    #    (row i in the index corresponds to line i in this file)
+    # ------------------------------------------------------------
+
+    with open(f"{output_prefix}.meta.jsonl", "w", encoding="utf-8") as f:
+        for _, row in df.iterrows():
+            record = {
+                "case_id": row["case_id"],
+                "lang": row["lang"],
+                "topic": row["topic"],
+                "case_text": row["case_text"],
+                "resolution": row["resolution"],
+                "status": row["status"],
+            }
+            f.write(json.dumps(record, ensure_ascii=False) + "\n")
+
+    # ------------------------------------------------------------
+    # 7) Persist a manifest pinning the exact model/version used,
+    #    so the search service can assert integrity on load.
+    # ------------------------------------------------------------
+
+    manifest = {
+        "encoder_name": ENCODER_NAME,
+        "embedding_dim": dim,
+        "preprocessing_version": PREPROCESSING_VERSION,
+        "num_cases": len(df),
+        "metric": "inner_product_on_l2_normalised",
+    }
+
+    with open(f"{output_prefix}.manifest.json", "w", encoding="utf-8") as f:
+        json.dump(manifest, f, ensure_ascii=False, indent=2)
+
+    print(f"Saved index + metadata + manifest to: {output_prefix}.*")
+
+    return manifest
+
+
+if __name__ == "__main__":
+    build_index()
