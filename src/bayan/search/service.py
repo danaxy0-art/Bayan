@@ -1,15 +1,21 @@
 """Lab 5 starter: two-stage bilingual case search."""
 
 import json
+import time
 
 import numpy as np
 import faiss
 
-from sentence_transformers import SentenceTransformer
+from sentence_transformers import SentenceTransformer, CrossEncoder
+
+
+# Multilingual cross-encoder for stage-2 reranking. Works across
+# Arabic/English query-document pairs.
+RERANKER_NAME = "cross-encoder/mmarco-mMiniLMv2-L12-H384-v1"
 
 
 class CaseSearch:
-    def __init__(self, prefix: str):
+    def __init__(self, prefix: str, load_reranker: bool = True):
         """Load the FAISS index, its metadata, and manifest for a given
         index prefix (e.g. "artifacts/search/bayan_index"), and assert
         that the on-disk artefacts are internally consistent.
@@ -68,30 +74,22 @@ class CaseSearch:
 
         self.encoder = SentenceTransformer(self.encoder_name)
 
+        # ------------------------------------------------------------
+        # 6) Optionally load the stage-2 cross-encoder reranker
+        # ------------------------------------------------------------
+
+        self.reranker = None
+        if load_reranker:
+            self.reranker = CrossEncoder(RERANKER_NAME)
+
         print(
             f"Loaded index: {self.index.ntotal} cases, "
-            f"dim={self.embedding_dim}, encoder={self.encoder_name}"
+            f"dim={self.embedding_dim}, encoder={self.encoder_name}, "
+            f"reranker={'loaded' if self.reranker else 'disabled'}"
         )
 
-    def search(
-        self,
-        query: str,
-        k: int = 5,
-        candidates: int = 50,
-        min_score: float = 0.25,
-    ):
-        """Search for the top-k most relevant cases for a query.
-
-        1. Normalise the query into the same space as the index.
-        2. Retrieve `candidates` nearest neighbours via the bi-encoder
-           (first-stage retrieval).
-        3. Return the top-k, honestly reporting an empty result if the
-           best score doesn't clear min_score.
-        """
-
-        # ------------------------------------------------------------
-        # 1) Encode + L2-normalise the query
-        # ------------------------------------------------------------
+    def _retrieve_candidates(self, query: str, candidates: int):
+        """Stage 1: bi-encoder retrieval. Returns (scores, indices)."""
 
         query_embedding = self.encoder.encode(
             [query],
@@ -100,21 +98,39 @@ class CaseSearch:
 
         faiss.normalize_L2(query_embedding)
 
-        # ------------------------------------------------------------
-        # 2) Bi-encoder retrieval: get the top `candidates` nearest
-        #    neighbours from the index (inner product == cosine
-        #    similarity, since both sides are L2-normalised).
-        # ------------------------------------------------------------
-
         n_candidates = min(candidates, self.index.ntotal)
-
         scores, indices = self.index.search(query_embedding, n_candidates)
 
-        scores = scores[0]
-        indices = indices[0]
+        return scores[0], indices[0]
+
+    def search(
+        self,
+        query: str,
+        k: int = 5,
+        candidates: int = 50,
+        min_score: float = 0.25,
+        rerank: bool = True,
+    ):
+        """Search for the top-k most relevant cases for a query.
+
+        1. Normalise the query into the same space as the index.
+        2. Retrieve `candidates` nearest neighbours via the bi-encoder
+           (stage 1). If the best bi-encoder score doesn't clear
+           min_score, honestly return an empty result.
+        3. If rerank=True, re-score the surviving candidates with a
+           cross-encoder (stage 2) and re-sort by that score before
+           taking the top-k. If rerank=False, take the top-k directly
+           from the stage-1 (bi-encoder) ranking.
+        """
 
         # ------------------------------------------------------------
-        # 3) Honest empty result: if even the best candidate doesn't
+        # 1) Stage 1: bi-encoder retrieval
+        # ------------------------------------------------------------
+
+        scores, indices = self._retrieve_candidates(query, candidates)
+
+        # ------------------------------------------------------------
+        # 2) Honest empty result: if even the best candidate doesn't
         #    clear min_score, we say so rather than returning noise.
         # ------------------------------------------------------------
 
@@ -126,17 +142,37 @@ class CaseSearch:
                 "best_score": float(scores[0]) if len(scores) > 0 else None,
             }
 
+        # Keep only candidates that clear the threshold
+        surviving = [
+            (score, idx)
+            for score, idx in zip(scores, indices)
+            if score >= min_score and idx >= 0
+        ]
+
         # ------------------------------------------------------------
-        # 4) Take the top-k of the candidates that clear min_score
+        # 3) Stage 2: cross-encoder reranking (optional)
+        # ------------------------------------------------------------
+
+        if rerank and self.reranker is not None and surviving:
+            pairs = [
+                (query, self.metadata[idx]["case_text"])
+                for _, idx in surviving
+            ]
+            rerank_scores = self.reranker.predict(pairs)
+
+            # Re-sort by cross-encoder score, descending
+            surviving = [
+                (float(rerank_scores[i]), surviving[i][1])
+                for i in range(len(surviving))
+            ]
+            surviving.sort(key=lambda x: x[0], reverse=True)
+
+        # ------------------------------------------------------------
+        # 4) Take the top-k
         # ------------------------------------------------------------
 
         results = []
-        for score, idx in zip(scores, indices):
-            if score < min_score:
-                continue
-            if idx < 0:
-                continue
-
+        for score, idx in surviving[:k]:
             case = self.metadata[idx]
             results.append({
                 "case_id": case["case_id"],
@@ -146,9 +182,6 @@ class CaseSearch:
                 "resolution": case["resolution"],
                 "score": float(score),
             })
-
-            if len(results) >= k:
-                break
 
         return {
             "query": query,
