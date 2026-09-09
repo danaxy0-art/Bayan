@@ -24,14 +24,17 @@ class CaseSearch:
         # ------------------------------------------------------------
         # 1) Load the manifest first, so we know what encoder to load
         #    and what to expect from the index/metadata.
+        #    Manifest keys: model, dim, preproc_version, n_vectors
+        #    (matches the Lab 5 reliability contract test).
         # ------------------------------------------------------------
 
-        with open(f"{prefix}.manifest.json", encoding="utf-8") as f:
+        with open(f"{prefix}_manifest.json", encoding="utf-8") as f:
             self.manifest = json.load(f)
 
-        self.encoder_name = self.manifest["encoder_name"]
-        self.embedding_dim = self.manifest["embedding_dim"]
-        self.num_cases = self.manifest["num_cases"]
+        self.encoder_name = self.manifest["model"]
+        self.embedding_dim = self.manifest["dim"]
+        self.num_cases = self.manifest["n_vectors"]
+        self.preproc_version = self.manifest["preproc_version"]
 
         # ------------------------------------------------------------
         # 2) Load the FAISS index
@@ -53,7 +56,7 @@ class CaseSearch:
         # ------------------------------------------------------------
 
         assert self.index.ntotal == self.num_cases, (
-            f"Manifest says {self.num_cases} cases, but the FAISS "
+            f"Manifest says {self.num_cases} vectors, but the FAISS "
             f"index has {self.index.ntotal} vectors."
         )
 
@@ -63,8 +66,8 @@ class CaseSearch:
         )
 
         assert self.index.d == self.embedding_dim, (
-            f"Manifest says embedding_dim={self.embedding_dim}, but "
-            f"the FAISS index dimension is {self.index.d}."
+            f"Manifest says dim={self.embedding_dim}, but the FAISS "
+            f"index dimension is {self.index.d}."
         )
 
         # ------------------------------------------------------------
@@ -123,16 +126,7 @@ class CaseSearch:
            from the stage-1 (bi-encoder) ranking.
         """
 
-        # ------------------------------------------------------------
-        # 1) Stage 1: bi-encoder retrieval
-        # ------------------------------------------------------------
-
         scores, indices = self._retrieve_candidates(query, candidates)
-
-        # ------------------------------------------------------------
-        # 2) Honest empty result: if even the best candidate doesn't
-        #    clear min_score, we say so rather than returning noise.
-        # ------------------------------------------------------------
 
         if len(scores) == 0 or scores[0] < min_score:
             return {
@@ -142,16 +136,11 @@ class CaseSearch:
                 "best_score": float(scores[0]) if len(scores) > 0 else None,
             }
 
-        # Keep only candidates that clear the threshold
         surviving = [
             (score, idx)
             for score, idx in zip(scores, indices)
             if score >= min_score and idx >= 0
         ]
-
-        # ------------------------------------------------------------
-        # 3) Stage 2: cross-encoder reranking (optional)
-        # ------------------------------------------------------------
 
         if rerank and self.reranker is not None and surviving:
             pairs = [
@@ -160,16 +149,11 @@ class CaseSearch:
             ]
             rerank_scores = self.reranker.predict(pairs)
 
-            # Re-sort by cross-encoder score, descending
             surviving = [
                 (float(rerank_scores[i]), surviving[i][1])
                 for i in range(len(surviving))
             ]
             surviving.sort(key=lambda x: x[0], reverse=True)
-
-        # ------------------------------------------------------------
-        # 4) Take the top-k
-        # ------------------------------------------------------------
 
         results = []
         for score, idx in surviving[:k]:

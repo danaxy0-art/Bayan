@@ -19,19 +19,23 @@ PREPROCESSING_VERSION = "bayan_ar_v1"
 
 def build_index(
     cases_path: str = "data/search/bayan_cases.csv",
-    output_prefix: str = "artifacts/search/bayan_index",
+    prefix: str = "artifacts/search/bayan_index",
     batch_size: int = 64,
+    limit: int = None,
 ):
     """Build an L2-normalised FAISS index over case texts and persist it,
     along with row metadata and a manifest pinning the model/version used.
 
-    Writes three files, all sharing output_prefix:
-      {prefix}.faiss    - the FAISS index itself
-      {prefix}.meta.jsonl - one JSON line per case, in index order
-      {prefix}.manifest.json - encoder name, dim, preprocessing version, counts
+    Writes three files, all sharing `prefix`:
+      {prefix}.faiss         - the FAISS index itself
+      {prefix}.meta.jsonl    - one JSON line per case, in index order
+      {prefix}_manifest.json - model/dim/preproc_version/n_vectors
+
+    limit: if given, only the first `limit` rows of cases_path are
+    indexed (useful for fast tests on a small subset).
     """
 
-    output_path = Path(output_prefix)
+    output_path = Path(prefix)
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
     # ------------------------------------------------------------
@@ -39,6 +43,10 @@ def build_index(
     # ------------------------------------------------------------
 
     df = pd.read_csv(cases_path)
+
+    if limit is not None:
+        df = df.head(limit)
+
     print(f"Loaded {len(df)} cases")
 
     texts = df["case_text"].astype(str).tolist()
@@ -79,14 +87,14 @@ def build_index(
     # 5) Persist the index
     # ------------------------------------------------------------
 
-    faiss.write_index(index, f"{output_prefix}.faiss")
+    faiss.write_index(index, f"{prefix}.faiss")
 
     # ------------------------------------------------------------
     # 6) Persist metadata, one JSON line per case, in index order
     #    (row i in the index corresponds to line i in this file)
     # ------------------------------------------------------------
 
-    with open(f"{output_prefix}.meta.jsonl", "w", encoding="utf-8") as f:
+    with open(f"{prefix}.meta.jsonl", "w", encoding="utf-8") as f:
         for _, row in df.iterrows():
             record = {
                 "case_id": row["case_id"],
@@ -101,20 +109,21 @@ def build_index(
     # ------------------------------------------------------------
     # 7) Persist a manifest pinning the exact model/version used,
     #    so the search service can assert integrity on load.
+    #    Key names match the Lab 5 reliability contract test.
     # ------------------------------------------------------------
 
     manifest = {
-        "encoder_name": ENCODER_NAME,
-        "embedding_dim": dim,
-        "preprocessing_version": PREPROCESSING_VERSION,
-        "num_cases": len(df),
+        "model": ENCODER_NAME,
+        "dim": dim,
+        "preproc_version": PREPROCESSING_VERSION,
+        "n_vectors": index.ntotal,
         "metric": "inner_product_on_l2_normalised",
     }
 
-    with open(f"{output_prefix}.manifest.json", "w", encoding="utf-8") as f:
+    with open(f"{prefix}_manifest.json", "w", encoding="utf-8") as f:
         json.dump(manifest, f, ensure_ascii=False, indent=2)
 
-    print(f"Saved index + metadata + manifest to: {output_prefix}.*")
+    print(f"Saved index + metadata + manifest to: {prefix}.*")
 
     return manifest
 
