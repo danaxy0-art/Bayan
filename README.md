@@ -34,14 +34,24 @@ A training project built as part of **SDAIA Academy**, aiming to build a bilingu
 - Implemented Arabic clitic segmentation via CAMeL Tools
 - Ran a bake-off comparing three Arabic-centric checkpoints across language/dialect slices
 
-### Lab 5 — Bilingual Semantic Search *(in progress)*
-- Built an L2-normalised FAISS index with accompanying metadata and a version-pinned manifest
+### Lab 5 — Bilingual Semantic Search
+- Built an L2-normalised FAISS index (20,000 cases) with versioned metadata and a manifest pinning the exact model/preprocessing used
+- Implemented two-stage retrieval: bi-encoder first-stage search plus optional multilingual cross-encoder reranking
+- Evaluated retrieval quality (recall@10, MRR@10) on 150 labelled queries, sliced by query language
+- Tuned an honest no-answer threshold, verified against 20 deliberately unanswerable queries
+- Verified, with measured metrics, the effect of a deliberately planted un-normalised-vector failure on retrieval quality
 
 ---
 
-##  A Note on the Data
+##  Notes on the Data
 
-Throughout the project, nearly every trained model reached near-perfect or perfect scores (macro-F1 ≈ 1.0) — from the simple TF-IDF baseline, to fully fine-tuned BERT-based classifiers, to the NER model. This recurring pattern strongly suggests that the project's dataset (explicitly flagged as `synthetic` in its columns) is highly templated, making the task easier than it would be on real, messy data — rather than reflecting genuinely exceptional, generalizable model performance. This observation is documented in detail in `NOTES.md` and `BENCHMARKS.md` for each lab.
+Two recurring, evidence-based findings shaped how results from this project should be read:
+
+1. **Near-perfect scores across most trained models.** From the simple TF-IDF baseline, to fully fine-tuned BERT-based classifiers, to NER, most models reached macro-F1/entity-F1 ≈ 1.0. This strongly suggests the dataset (explicitly flagged as `synthetic` in its columns) is highly templated, making the task easier than it would be on real, messy data.
+
+2. **Low semantic-search recall traced to label design, not a search bug.** In Lab 5, recall@10 was very low (0.0077) despite manual spot-checks confirming the search pipeline retrieves highly relevant results. Root-cause analysis showed the labelled "relevant" cases per query are a near-random sample within the correct topic (not the most textually/semantically similar cases), and that recall scales strongly with how many same-topic "distractor" cases exist in the corpus — confirmed by re-testing on a smaller case subset, where recall rose ~16x.
+
+Both observations are documented in detail in `NOTES.md` and `BENCHMARKS.md` for each relevant lab.
 
 ---
 
@@ -51,8 +61,14 @@ Built with Python 3.12, using `transformers`, `torch`, `datasets`, `scikit-learn
 
 ---
 
+##  Remaining Work
+
+Labs 6 (evaluation report, model cards) and 7 (latency optimisation, ONNX/INT8, serving) are in progress.
+
+---
+
 ##  Author
 
-Dana Alsaidan — [GitHub](https://github.com/danaxy0-art)
+Dana alsaidan— [GitHub](https://github.com/danaxy0-art)
 
 This repository was built as part of a training project with [**SDAIA Academy**](https://github.com/SDAIAAcademy).
