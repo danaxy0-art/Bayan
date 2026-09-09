@@ -3,6 +3,9 @@
 import re
 from dataclasses import dataclass
 
+from camel_tools.disambig.mle import MLEDisambiguator
+from camel_tools.tokenizers.morphological import MorphologicalTokenizer
+
 
 @dataclass(frozen=True)
 class ArabicProfile:
@@ -59,6 +62,51 @@ def normalize_arabic(text: str, profile: ArabicProfile) -> str:
     return normalized
 
 
+# Lazily initialised on first use, since loading the disambiguator/
+# morphology DB is slow and only needed when segment() is actually called.
+_disambiguator = None
+_tokenizer = None
+
+
+def _get_tokenizer():
+    global _disambiguator, _tokenizer
+
+    if _tokenizer is None:
+        _disambiguator = MLEDisambiguator.pretrained("calima-msa-r13")
+        _tokenizer = MorphologicalTokenizer(
+            disambiguator=_disambiguator,
+            scheme="atbtok",
+            split=True,
+        )
+
+    return _tokenizer
+
+
 def segment(text: str) -> list[str]:
-    # TODO(Lab 4 - Step 3): wire the chosen CAMeL Tools clitic segmentation scheme.
-    raise NotImplementedError
+    """Split Arabic text into clitic-segmented tokens using CAMeL Tools.
+
+    Non-Arabic tokens (e.g. English words, numbers, IDs) are passed
+    through unchanged, since the morphological analyser only segments
+    Arabic script.
+    """
+
+    tokenizer = _get_tokenizer()
+
+    words = text.split()
+    segmented_tokens = []
+
+    for word in words:
+        if re.search(r"[\u0600-\u06FF]", word):
+            pieces = tokenizer.tokenize([word])
+            segmented_tokens.extend(pieces)
+        else:
+            segmented_tokens.append(word)
+
+    # Strip clitic-boundary markers ("+") to match the plain-token
+    # format used in the prepared bayan_ner_segmented.conll data.
+    cleaned_tokens = [
+        token.replace("+", "")
+        for token in segmented_tokens
+    ]
+
+    return cleaned_tokens

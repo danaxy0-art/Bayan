@@ -95,5 +95,16 @@ _counts_ are identical between the two models (same BERT-base architecture:
 
 ## Lab 4 — Dialect audit
 
-- Distribution:
-- One-sentence implication for MSA-only evaluation:
+- Distribution: Gulf 4,800 (66.67%) | MSA 2,400 (33.33%) — out of 7,200 Arabic-language rows total
+- One-sentence implication for MSA-only evaluation: MSA makes up only 33.3% of Arabic rows (2,400 MSA vs 4,800 Gulf), so evaluating only on MSA would leave the majority of Arabic dialectal traffic (Gulf) unmeasured, risking an inflated sense of Arabic performance that does not reflect real citizen feedback, most of which is dialectal, not MSA.
+
+## Lab 4 — Step 3: Clitic Segmentation Impact on NER
+
+**Note:** LOCATION recall on the Day-2 (Lab 3B) NER model was already
+1.00 (100%) on the un-segmented data (see Lab 3B results). Since recall
+cannot exceed 100%, the target of "+4 recall points" is mathematically
+unreachable here — this is a further symptom of the templated/synthetic
+nature of this project's data (see Lab 3A/3B notes on perfect scores).
+Re-training on `bayan_ner_segmented.conll` was deferred; `segment()`
+itself was implemented and is available for use in a more realistic
+dataset where headroom for improvement would exist.
