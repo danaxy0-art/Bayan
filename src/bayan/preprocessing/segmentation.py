@@ -4,36 +4,44 @@ import spacy
 
 from bayan.preprocessing.core import preprocess
 
+
 def build_pipeline():
-        #blank multilingual spacy pipline
+    # Blank multilingual spaCy pipeline.
     nlp = spacy.blank("xx")
 
-    #add lightweight sentence segmentation component.
-    nlp.add_pipe("sentencizer", config=config)
+    # Add lightweight sentence segmentation component.
+    nlp.add_pipe("sentencizer") #set end & start of sentence by . ? !
 
     return nlp
-    raise NotImplementedError("Implement build_pipeline() in Lab 1")
 
 
 def split_sentences(raw: str, nlp) -> list[str]:
-   # Important: use the same preprocessing contract first.
-text = preprocess (raw)
-doc = ntp(text)
+    # Important: use the same preprocessing contract first.
+    text = preprocess(raw)
 
-return [
-    sent.text.strip()
-    for sent in doc.sents 
-    if sent.text.strip()
-]
-    raise NotImplementedError("Implement split_sentences() in Lab 1")
+    doc = nlp(text)
 
+    return [
+        sent.text.strip()
+        for sent in doc.sents
+        if sent.text.strip()
+    ]
+    
+    
 """
-test it : python
-from bayan preprocessing. segmentation import build_pipeline, split_sentences
-nip = build_pipeline()
-". الخدمة معتازا. لكن التطبيل بطرء. أرجو حل المشكلة " = text
-print (split_sentences(text, ntp))
-".١ رقمى 0551234567. الخدمة ممنازة" = text
+test it using : 
+in cmd write:
+1-
+python
+
+2-
+from bayan.preprocessing.segmentation import build_pipeline, split_sentences
+nlp = build_pipeline()
+text = "الخدمة ممتازة. لكن التطبيق بطيء. أرجو حل المشكلة."
 print(split_sentences(text, nlp))
-print()
-  """  
+text = "رقمي 0551234567. الخدمــــة ممتازة 😍."
+print(split_sentences(text, nlp))
+
+3-
+exit()
+"""
