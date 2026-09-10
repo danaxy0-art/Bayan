@@ -7,7 +7,8 @@ orchestration; reusable logic belongs in the package modules.
 import torch
 from fastapi import FastAPI
 
-from transformers import AutoTokenizer, AutoModelForSequenceClassification
+from optimum.onnxruntime import ORTModelForSequenceClassification
+from transformers import AutoTokenizer
 
 from bayan.preprocessing.core import preprocess
 from bayan.serving.canaries import run_startup_canaries
@@ -19,19 +20,22 @@ app = FastAPI(title="Bayan — Bilingual Citizen-Feedback Intelligence Service")
 # ------------------------------------------------------------
 # Model loaded once at import time, reused across requests.
 #
-# Loaded at module level (not via a startup event) so it works
-# consistently whether the app is run with `uvicorn` or exercised
-# directly through fastapi.testclient.TestClient() without a `with`
-# block (which does not trigger startup/shutdown lifecycle events).
+# Uses the WINNING artefact from the Lab 7 optimisation ladder
+# (INT8-quantised ONNX, ~25x faster than the original fp32 torch
+# checkpoint with zero measured quality tax — see BENCHMARKS.md),
+# rather than the original fp32 training artefact.
 # ------------------------------------------------------------
 
-CLASSIFIER_DIR = "artifacts/topic_classifier"
+CLASSIFIER_DIR = "artifacts/topic_classifier"          # for canaries / tokenizer / id2label
+ONNX_INT8_DIR = "artifacts/onnx/classifier_int8"        # winning serving artefact
 
 run_startup_canaries()
 
 _tokenizer = AutoTokenizer.from_pretrained(CLASSIFIER_DIR)
-_model = AutoModelForSequenceClassification.from_pretrained(CLASSIFIER_DIR)
-_model.eval()
+_model = ORTModelForSequenceClassification.from_pretrained(
+    ONNX_INT8_DIR, file_name="model_quantized.onnx"
+)
+_id2label = _model.config.id2label
 
 
 @app.get("/health")
@@ -66,7 +70,7 @@ def classify(payload: dict):
     pred_id = int(torch.argmax(probs).item())
     confidence = float(probs[pred_id].item())
 
-    topic = _model.config.id2label[pred_id]
+    topic = _id2label[pred_id]
 
     return {
         "topic": topic,

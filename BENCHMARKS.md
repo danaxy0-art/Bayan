@@ -102,3 +102,35 @@ INT8 ONNX p99 speed-up vs fp32 torch: 2.61x
 Quantisation quality tax: +0.0000 (within 0.01 target)
 
 INT8 ONNX p99 speed-up vs fp32 torch: 2.14x
+
+## Lab 7 - HTTP Load Test (16 concurrent clients)
+
+- Total requests: 200
+- Successful: 200, Errors: 0
+- Throughput: 12.55 req/s
+- p50: 1264.94 ms
+- p99: 1529.00 ms
+- Target (p99 <= 40ms): FAIL
+
+## Lab 7 - HTTP Load Test (16 concurrent clients)
+
+- Total requests: 200
+- Successful: 200, Errors: 0
+- Throughput: 198.94 req/s
+- p50: 77.71 ms
+- p99: 93.19 ms
+- Target (p99 <= 40ms): FAIL
+
+## Lab 7 - NER ONNX / INT8 Export
+
+| Configuration | entity-F1 | mean (ms) | p99 (ms) |
+|---|---:|---:|---:|
+| fp32 torch (original) | 1.0000 | 115.67 | 103.75 |
+| fp32 ONNX | 1.0000 | 38.32 | 48.95 |
+| INT8 ONNX | 1.0000 | 34.58 | 48.36 |
+
+Quantisation quality tax: +0.0000
+INT8 speed-up vs fp32 torch: 2.15x
+
+**NER quantisation decision:** quantise
+(quality tax=+0.0000 vs 0.01 limit, speed-up=2.15x)
