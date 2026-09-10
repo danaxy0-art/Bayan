@@ -71,3 +71,10 @@
 | Model              | Metric   | Validation | Frozen Test |
 | ------------------ | -------- | ---------: | ----------: |
 | TF-IDF + LinearSVC | macro-F1 |     1.0000 |      1.0000 |
+
+## Lab 7 - Latency Optimisation Ladder
+
+| Configuration | p50 (ms) | p99 (ms) | Threads |
+|---|---:|---:|---:|
+| fp32 torch @512 padded | 1286.77 | 1348.48 | 1 |
+| fp32 torch dynamic padding | 176.10 | 301.88 | 1 |
