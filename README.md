@@ -1,7 +1,7 @@
 # Bayan
 ### SDA-AIE-211 — Natural Language Processing with Transformers
 
-A training project built as part of **SDAIA Academy**, aiming to build a bilingual (Arabic/English) AI service for analyzing citizen complaints and feedback — starting from raw text preprocessing, through fine-tuned Transformer models, semantic search, and full evaluation.
+A training project built as part of **SDAIA Academy**, delivering a bilingual (Arabic/English) AI service for analyzing citizen complaints and feedback — from raw text preprocessing, through fine-tuned Transformer models, semantic search, full evaluation, and a latency-optimised serving API.
 
 ---
 
@@ -48,17 +48,24 @@ A training project built as part of **SDAIA Academy**, aiming to build a bilingu
 - Since the topic classifier reaches 100% accuracy on the clean test set, generated 120 real model errors via realistic input noise (truncation, word-drop, typos) and manually taxonomised the root causes, uncovering a strong "attractor-class" bias in the model's failure mode
 - Produced model cards (with hand-written "known limitations" sections) for the topic classifier, NER model, and the Arabic dialect-aware checkpoint
 
+### Lab 7 — Hitting the Latency Budget
+- Benchmarked baseline fp32 latency, then applied dynamic padding as a free win (**4.47x** p99 speed-up)
+- Exported the topic classifier to ONNX and quantised to INT8, with a paired accuracy/latency comparison (**25.6x** cumulative speed-up, **0 measured quality tax**)
+- Repeated ONNX export + INT8 quantisation for the NER model, with an evidence-based quantise/keep-fp32 decision (**2.15x** speed-up, 0 quality tax → quantise)
+- Wired the winning INT8 ONNX artefact into a FastAPI service (`/health`, `/v1/classify`) with startup canaries that fail fast on artefact/version mismatches
+- Ran an HTTP load test with 16 concurrent clients: **16x** reduction in end-to-end p99 latency (1529ms → 93ms) after wiring in the optimised artefact — honestly documented as not fully meeting the ≤40ms HTTP / ≤25ms bare-model targets, with root causes (CPU-only inference, Python GIL under concurrency, single-worker uvicorn) recorded for follow-up
+
 ---
 
 ##  Notes on the Data
 
-Two recurring, evidence-based findings shaped how results from this project should be read:
+Three recurring, evidence-based findings shaped how results from this project should be read:
 
 1. **Near-perfect scores across most trained models.** From the simple TF-IDF baseline, to fully fine-tuned BERT-based classifiers, to NER, most models reached macro-F1/entity-F1 ≈ 1.0. This strongly suggests the dataset (explicitly flagged as `synthetic` in its columns) is highly templated, making the task easier than it would be on real, messy data.
 
 2. **Low semantic-search recall traced to label design, not a search bug.** In Lab 5, recall@10 was very low (0.0077) despite manual spot-checks confirming the search pipeline retrieves highly relevant results. Root-cause analysis showed the labelled "relevant" cases per query are a near-random sample within the correct topic (not the most textually/semantically similar cases), and that recall scales strongly with how many same-topic "distractor" cases exist in the corpus — confirmed by re-testing on a smaller case subset, where recall rose ~16x.
 
-A third finding from Lab 6: manually generated model errors (via realistic input noise, since the model has no organic errors) reveal a systemic "attractor-class" bias — the classifier collapses toward 3 of 8 topics (roads/water/parks, 79% of all errors) under low-signal input, and never mispredicts two other classes at all, suggesting overconfidence rather than calibrated uncertainty.
+3. **Manually generated model errors reveal a systemic "attractor-class" bias.** Since the classifier has no organic errors, 120 errors were generated via realistic input noise (Lab 6). These show the model collapses toward 3 of 8 topics (roads/water/parks, 79% of all errors) under low-signal input, and never mispredicts two other classes at all — suggesting overconfidence rather than calibrated uncertainty.
 
 All three observations are documented in detail in `NOTES.md` and `BENCHMARKS.md` for each relevant lab.
 
@@ -66,18 +73,23 @@ All three observations are documented in detail in `NOTES.md` and `BENCHMARKS.md
 
 ##  Tech Stack
 
-Built with Python 3.12, using `transformers`, `torch`, `datasets`, `scikit-learn`, `pandas`, `camel-tools`, `faiss-cpu`, and `sentence-transformers`. Training was run on a mix of local CPU and Google Colab GPU runtimes, depending on task size.
+Built with Python 3.12, using `transformers`, `torch`, `datasets`, `scikit-learn`, `pandas`, `camel-tools`, `faiss-cpu`, `sentence-transformers`, `optimum[onnxruntime]`, and `fastapi`. Training was run on a mix of local CPU and Google Colab GPU runtimes, depending on task size; the final serving benchmarks were run entirely on CPU.
 
 ---
 
-##  Remaining Work
+##  Key Artefacts
 
-Lab 7 (latency optimisation, ONNX/INT8 quantisation, serving) is in progress.
+- `artifacts/topic_classifier/` — fine-tuned topic classifier (fp32)
+- `artifacts/ner/` — fine-tuned NER model (fp32)
+- `artifacts/onnx/classifier_int8/`, `artifacts/onnx/ner_int8/` — quantised serving artefacts (winning configuration, wired into the API)
+- `artifacts/search/` — FAISS index, metadata, and manifest
+- `BENCHMARKS.md`, `NOTES.md`, `DECISIONS.md`, `EVALUATION_REPORT.md` — measured evidence and written decisions for every lab
+- `model_card_topic_classifier.md`, `model_card_ner.md`, `model_card_arabic_da.md` — model cards with hand-written limitations
 
 ---
 
-##  Author
+## Author
 
-Dana alsaidan — [GitHub](https://github.com/danaxy0-art)
+Dana alsaidan— [GitHub](https://github.com/danaxy0-art)
 
 This repository was built as part of a training project with [**SDAIA Academy**](https://github.com/SDAIAAcademy).
