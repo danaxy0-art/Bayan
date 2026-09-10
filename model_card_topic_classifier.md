@@ -1,33 +1,20 @@
-# EVALUATION REPORT — Bayan
+# Model Card — Bayan Topic Classifier
 
-## Executive headline
-TODO(Lab 6): two sentences: aggregate summary + the risk/quality slice that matters.
+## Intended use
+Classifies bilingual (Arabic/English) citizen feedback text into one of 8 municipal service topics.
 
-## Sliced metrics with bootstrap CIs
-TODO
+## Artefact / data versions
+- Model/checkpoint: artifacts/topic_classifier
+- Preprocessing version: bayan_ar_v1
+- Data version/snapshot: bayan_feedback.csv (synthetic)
 
-## Behavioural suite
-TODO
-
-## Error taxonomy
-TODO: hand-read at least 100 errors (course lab uses 120), histogram, top-3 fixes and predicted deltas.
-
-## Retrieval quality
-TODO
-
-## Known limitations
-TODO — written by hand, not auto-generated.
-
-## Topic Classifier Evaluation
-
-### Overall metrics
-
+## Metrics
 | Metric | Value | 95% CI |
 |---|---:|---|
 | Accuracy | 1.0000 | [1.0000, 1.0000] |
 
-### Sliced report (14 slices)
 
+## Slice metrics
 | Slice type | Slice value | n | Accuracy | 95% CI | Flag |
 |---|---|---:|---:|---|---|
 | language | ar | 1450 | 1.0000 | [1.0000, 1.0000] |  |
@@ -45,10 +32,16 @@ TODO — written by hand, not auto-generated.
 | length | medium (40-100 chars) | 1888 | 1.0000 | [1.0000, 1.0000] |  |
 | length | short (<40 chars) | 520 | 1.0000 | [1.0000, 1.0000] |  |
 
-### Behavioural tests
-
+## Behavioural tests
 | Suite | Pass rate |
 |---|---:|
 | invariance | 100.00% |
 | directional | 100.00% |
 | mft | 100.00% |
+
+## Known limitations
+<!-- Lab 6: write this section by hand. Do not auto-generate it. -->
+TODO
+
+## Contact / owner
+TODO
