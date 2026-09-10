@@ -41,6 +41,13 @@ A training project built as part of **SDAIA Academy**, aiming to build a bilingu
 - Tuned an honest no-answer threshold, verified against 20 deliberately unanswerable queries
 - Verified, with measured metrics, the effect of a deliberately planted un-normalised-vector failure on retrieval quality
 
+### Lab 6 — The Evaluation Report
+- Implemented bootstrap confidence intervals and paired bootstrap significance testing from scratch
+- Built a sliced evaluation report (language, dialect, topic, text length — 14 slices) with per-slice confidence intervals and small-sample flagging
+- Implemented and ran an invariance / directional / minimum-functionality behavioural test suite
+- Since the topic classifier reaches 100% accuracy on the clean test set, generated 120 real model errors via realistic input noise (truncation, word-drop, typos) and manually taxonomised the root causes, uncovering a strong "attractor-class" bias in the model's failure mode
+- Produced model cards (with hand-written "known limitations" sections) for the topic classifier, NER model, and the Arabic dialect-aware checkpoint
+
 ---
 
 ##  Notes on the Data
@@ -51,7 +58,9 @@ Two recurring, evidence-based findings shaped how results from this project shou
 
 2. **Low semantic-search recall traced to label design, not a search bug.** In Lab 5, recall@10 was very low (0.0077) despite manual spot-checks confirming the search pipeline retrieves highly relevant results. Root-cause analysis showed the labelled "relevant" cases per query are a near-random sample within the correct topic (not the most textually/semantically similar cases), and that recall scales strongly with how many same-topic "distractor" cases exist in the corpus — confirmed by re-testing on a smaller case subset, where recall rose ~16x.
 
-Both observations are documented in detail in `NOTES.md` and `BENCHMARKS.md` for each relevant lab.
+A third finding from Lab 6: manually generated model errors (via realistic input noise, since the model has no organic errors) reveal a systemic "attractor-class" bias — the classifier collapses toward 3 of 8 topics (roads/water/parks, 79% of all errors) under low-signal input, and never mispredicts two other classes at all, suggesting overconfidence rather than calibrated uncertainty.
+
+All three observations are documented in detail in `NOTES.md` and `BENCHMARKS.md` for each relevant lab.
 
 ---
 
@@ -63,12 +72,12 @@ Built with Python 3.12, using `transformers`, `torch`, `datasets`, `scikit-learn
 
 ##  Remaining Work
 
-Labs 6 (evaluation report, model cards) and 7 (latency optimisation, ONNX/INT8, serving) are in progress.
+Lab 7 (latency optimisation, ONNX/INT8 quantisation, serving) is in progress.
 
 ---
 
 ##  Author
 
-Dana alsaidan— [GitHub](https://github.com/danaxy0-art)
+Dana alsaidan — [GitHub](https://github.com/danaxy0-art)
 
 This repository was built as part of a training project with [**SDAIA Academy**](https://github.com/SDAIAAcademy).
