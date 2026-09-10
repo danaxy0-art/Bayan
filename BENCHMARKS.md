@@ -78,3 +78,27 @@
 |---|---:|---:|---:|
 | fp32 torch @512 padded | 1286.77 | 1348.48 | 1 |
 | fp32 torch dynamic padding | 176.10 | 301.88 | 1 |
+
+## Lab 7 - ONNX / INT8 Export
+
+| Configuration | macro-F1 | mean (ms) | p99 (ms) |
+|---|---:|---:|---:|
+| fp32 torch (original) | 1.0000 | 103.87 | 134.23 |
+| fp32 ONNX | 1.0000 | 28.86 | 58.64 |
+| INT8 ONNX | 1.0000 | 23.77 | 51.40 |
+
+Quantisation quality tax: +0.0000 (within 0.01 target)
+
+INT8 ONNX p99 speed-up vs fp32 torch: 2.61x
+
+## Lab 7 - ONNX / INT8 Export
+
+| Configuration | macro-F1 | mean (ms) | p99 (ms) |
+|---|---:|---:|---:|
+| fp32 torch (original) | 1.0000 | 99.65 | 112.89 |
+| fp32 ONNX | 1.0000 | 29.38 | 55.03 |
+| INT8 ONNX | 1.0000 | 24.07 | 52.77 |
+
+Quantisation quality tax: +0.0000 (within 0.01 target)
+
+INT8 ONNX p99 speed-up vs fp32 torch: 2.14x
